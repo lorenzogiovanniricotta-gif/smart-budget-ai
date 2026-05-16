@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from google import genai
 from PIL import Image
 
@@ -76,10 +76,9 @@ with st.sidebar:
             
     st.write("---")
     st.header("🗑️ Gestione Errori")
-    # PULSANTE NUOVO: Cancella l'ultima riga inserita per rimediare agli errori
     if st.button("❌ Cancella Ultimo Inserimento"):
         if not df.empty:
-            df = df.drop(df.index[-1]) # Rimuove l'ultima riga
+            df = df.drop(df.index[-1])
             df.to_csv(DB_FILE, index=False)
             st.warning("Ultima transazione eliminata!")
             st.rerun()
@@ -93,7 +92,6 @@ with col1:
     st.header("📸 Carica Scontrino Automatico")
     file_scontrino = st.file_uploader("Trascina qui lo scontrino...", type=["png", "jpg", "jpeg"])
     
-    # Legge la chiave in automatico dai sistemi di sicurezza (Secrets) di Streamlit
     api_key = st.secrets["GEMINI_API_KEY"]
 
     if file_scontrino and api_key:
@@ -134,11 +132,17 @@ with col1:
 with col2:
     st.header("📊 Resoconto Finanziario")
     if not df.empty:
-        tutti_i_mesi = sorted(list(df["Mese_Anno"].dropna().unique()))
+        # Generiamo la lista dei mesi includendo anche i prossimi 6 mesi nel futuro
+        oggi = datetime.today()
+        mesi_futuri = [(oggi + timedelta(days=30 * i)).strftime("%Y-%m") for i in range(7)]
+        
+        mesi_storici = list(df["Mese_Anno"].dropna().unique())
+        tutti_i_mesi = sorted(list(set(mesi_storici + mesi_futuri)))
+        
         df_espanso = df[df["Ricorrente"] == "No"].copy()
         df_ricorrenti = df[df["Ricorrente"] == "Sì"].copy()
         
-        # Logica ricorrenze
+        # Logica di proiezione nel futuro per le ricorrenze
         righe_ricorrenti_generate = []
         for index, row in df_ricorrenti.iterrows():
             mese_inizio = row["Mese_Anno"]
@@ -154,54 +158,24 @@ with col2:
         else:
             df_visualizzazione = df_espanso.copy()
             
-        # Saldo Totale
-        saldo_totale = df_visualizzazione["Importo"].sum()
-        st.metric(label="Saldo Attuale Bilancio (Inclusi Ricorrenti)", value=f"{saldo_totale:.2f} €")
+        # Saldo Totale (calcolato solo fino al mese corrente per non falsare il portafoglio attuale)
+        mese_corrente_str = oggi.strftime("%Y-%m")
+        saldo_attuale = df_visualizzazione[df_visualizzazione["Mese_Anno"] <= mese_corrente_str]["Importo"].sum()
+        st.metric(label="Saldo Attuale Reale (Fino a questo mese)", value=f"{saldo_attuale:.2f} €")
         
-        # Registro Completo
-        st.subheader("📜 Registro Completo Transazioni")
-        st.dataframe(df_visualizzazione.sort_values(by="Data", ascending=False), use_container_width=True)
+        # Registro Completo (Mostra solo i dati reali inseriti, ordinati per data)
+        st.subheader("📜 Registro Transazioni Inserite")
+        st.dataframe(df.sort_values(by="Data", ascending=False), use_container_width=True)
         
-        # --- SEZIONE GRAFICI DI ANALISI ---
+        # --- SEZIONE GRAFICI DI PREVISIONE FUTURA ---
+        st.markdown("### 🔮 Previsioni e Analisi Futura (Prossimi 6 Mesi)")
+        
         df_entrate = df_visualizzazione[df_visualizzazione["Importo"] > 0].copy()
         df_uscite = df_visualizzazione[df_visualizzazione["Importo"] < 0].copy()
         df_uscite["Importo"] = df_uscite["Importo"].abs()
         
-        # 1. Grafico Uscite
-        st.subheader("📉 Analisi Spese per Mese e Anno")
+        # 1. Grafico Uscite (Storico + Futuro)
+        st.subheader("📉 Analisi Spese per Mese (Incluso Futuro)")
         if not df_uscite.empty:
-            spese_mensili = df_uscite.groupby("Mese_Anno")["Importo"].sum()
-            st.bar_chart(spese_mensili)
-        else:
-            st.info("Nessuna uscita registrata.")
-            
-        # 2. Grafico Entrate
-        st.subheader("📈 Analisi Entrate per Mese e Anno")
-        if not df_entrate.empty:
-            entrate_mensili = df_entrate.groupby("Mese_Anno")["Importo"].sum()
-            st.bar_chart(entrate_mensili)
-        else:
-            st.info("Nessuna entrata registrata.")
-            
-        # 3. Grafico di Confronto Totale
-        st.subheader("⚖️ Bilancio Totale: Entrate vs Uscite")
-        entrate_m = df_entrate.groupby("Mese_Anno")["Importo"].sum() if not df_entrate.empty else pd.Series(dtype=float)
-        spese_m = df_uscite.groupby("Mese_Anno")["Importo"].sum() if not df_uscite.empty else pd.Series(dtype=float)
-        
-        # Combiniamo le informazioni in un'unica tabella per il grafico doppio
-        tutti_i_mesi_charts = sorted(list(set(entrate_m.index).union(set(spese_m.index))))
-        df_confronto = pd.DataFrame(index=tutti_i_mesi_charts)
-        df_confronto["Entrate (€)"] = entrate_m
-        df_confronto["Uscite (€)"] = spese_m
-        df_confronto = df_confronto.fillna(0)
-        
-        if not df_confronto.empty:
-            st.bar_chart(df_confronto)
-            
-            # 4. Linea del Risparmio Netto
-            df_confronto["Risparmio Netto (€)"] = df_confronto["Entrate (€)"] - df_confronto["Uscite (€)"]
-            st.subheader("📈 Flusso di Cassa Netto (Risparmio Mensile)")
-            st.line_chart(df_confronto["Risparmio Netto (€)"])
-            
-    else:
-        st.info("Il registro è vuoto. Inserisci un movimento nella barra laterale o carica uno scontrino!")
+            spese_mensili = df_uscite.groupby("Mese_Anno")["Importo"].sum().reindex(tutti_i_mesi, fill_value=0)
+            st.bar_chart(spese_mens
