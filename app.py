@@ -73,6 +73,18 @@ with st.sidebar:
             df.to_csv(DB_FILE, index=False)
             st.success("Dato salvato con successo!")
             st.rerun()
+            
+    st.write("---")
+    st.header("🗑️ Gestione Errori")
+    # PULSANTE NUOVO: Cancella l'ultima riga inserita per rimediare agli errori
+    if st.button("❌ Cancella Ultimo Inserimento"):
+        if not df.empty:
+            df = df.drop(df.index[-1]) # Rimuove l'ultima riga
+            df.to_csv(DB_FILE, index=False)
+            st.warning("Ultima transazione eliminata!")
+            st.rerun()
+        else:
+            st.info("Il registro è già vuoto.")
 
 # Layout Principale a due colonne
 col1, col2 = st.columns([1, 1])
@@ -184,7 +196,6 @@ with col2:
         df_confronto = df_confronto.fillna(0)
         
         if not df_confronto.empty:
-            # Mostra le due barre affiancate per ogni mese
             st.bar_chart(df_confronto)
             
             # 4. Linea del Risparmio Netto
