@@ -178,4 +178,35 @@ with col2:
         st.subheader("📉 Analisi Spese per Mese (Incluso Futuro)")
         if not df_uscite.empty:
             spese_mensili = df_uscite.groupby("Mese_Anno")["Importo"].sum().reindex(tutti_i_mesi, fill_value=0)
-            st.bar_chart(spese_mens
+            st.bar_chart(spese_mensili)
+        else:
+            st.info("Nessuna uscita registrata.")
+            
+        # 2. Grafico Entrate (Storico + Futuro)
+        st.subheader("📈 Analisi Entrate per Mese (Incluso Futuro)")
+        if not df_entrate.empty:
+            entrate_mensili = df_entrate.groupby("Mese_Anno")["Importo"].sum().reindex(tutti_i_mesi, fill_value=0)
+            st.bar_chart(entrate_mensili)
+        else:
+            st.info("Nessuna entrata registrata.")
+            
+        # 3. Grafico di Confronto Totale (Storico + Futuro)
+        st.subheader("⚖️ Bilancio Totale: Entrate vs Uscite Previsionali")
+        entrate_m = df_entrate.groupby("Mese_Anno")["Importo"].sum() if not df_entrate.empty else pd.Series(dtype=float)
+        spese_m = df_uscite.groupby("Mese_Anno")["Importo"].sum() if not df_uscite.empty else pd.Series(dtype=float)
+        
+        df_confronto = pd.DataFrame(index=tutti_i_mesi)
+        df_confronto["Entrate (€)"] = entrate_m
+        df_confronto["Uscite (€)"] = spese_m
+        df_confronto = df_confronto.fillna(0)
+        
+        if not df_confronto.empty:
+            st.bar_chart(df_confronto)
+            
+            # 4. Linea del Risparmio Netto Previsionale
+            df_confronto["Risparmio Netto (€)"] = df_confronto["Entrate (€)"] - df_confronto["Uscite (€)"]
+            st.subheader("📈 Flusso di Cassa Netto Stimato (Risparmio Mensile)")
+            st.line_chart(df_confronto["Risparmio Netto (€)"])
+            
+    else:
+        st.info("Il registro è vuoto. Inserisci un movimento nella barra laterale o carica uno scontrino!")
