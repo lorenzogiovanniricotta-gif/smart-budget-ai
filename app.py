@@ -80,8 +80,10 @@ col1, col2 = st.columns([1, 1])
 with col1:
     st.header("📸 Carica Scontrino Automatico")
     file_scontrino = st.file_uploader("Trascina qui lo scontrino...", type=["png", "jpg", "jpeg"])
-# Legge la chiave in automatico dai sistemi di sicurezza di Streamlit
-api_key = st.secrets["GEMINI_API_KEY"]
+    
+    # Legge la chiave in automatico dai sistemi di sicurezza (Secrets) di Streamlit
+    api_key = st.secrets["GEMINI_API_KEY"]
+
     if file_scontrino and api_key:
         image = Image.open(file_scontrino)
         st.image(image, caption="Scontrino caricato", width=250)
@@ -91,7 +93,7 @@ api_key = st.secrets["GEMINI_API_KEY"]
                 try:
                     client = genai.Client(api_key=api_key)
                     response = client.models.generate_content(
-                        model='gemini-3-flash-preview',
+                        model='gemini-2.5-flash',
                         contents=[image, SYSTEM_INSTRUCTION]
                     )
                     testo_json = response.text.replace("```json", "").replace("```", "").strip()
@@ -161,7 +163,7 @@ with col2:
         else:
             st.info("Nessuna uscita registrata.")
             
-        # 2. Grafico Entrate (Nuovo!)
+        # 2. Grafico Entrate
         st.subheader("📈 Analisi Entrate per Mese e Anno")
         if not df_entrate.empty:
             entrate_mensili = df_entrate.groupby("Mese_Anno")["Importo"].sum()
@@ -169,7 +171,7 @@ with col2:
         else:
             st.info("Nessuna entrata registrata.")
             
-        # 3. Grafico di Confronto Totale (Nuovo!)
+        # 3. Grafico di Confronto Totale
         st.subheader("⚖️ Bilancio Totale: Entrate vs Uscite")
         entrate_m = df_entrate.groupby("Mese_Anno")["Importo"].sum() if not df_entrate.empty else pd.Series(dtype=float)
         spese_m = df_uscite.groupby("Mese_Anno")["Importo"].sum() if not df_uscite.empty else pd.Series(dtype=float)
