@@ -80,8 +80,8 @@ col1, col2 = st.columns([1, 1])
 with col1:
     st.header("📸 Carica Scontrino Automatico")
     file_scontrino = st.file_uploader("Trascina qui lo scontrino...", type=["png", "jpg", "jpeg"])
-    api_key = st.text_input("Inserisci la tua API Key di AI Studio:", type="password")
-
+# Legge la chiave in automatico dai sistemi di sicurezza di Streamlit
+api_key = st.secrets["GEMINI_API_KEY"]
     if file_scontrino and api_key:
         image = Image.open(file_scontrino)
         st.image(image, caption="Scontrino caricato", width=250)
